@@ -31,11 +31,12 @@ class LRUKNode {
  public:
   LRUKNode(size_t k, frame_id_t fid) : k_(k), fid_(fid), is_evictable_(false) {}
   LRUKNode() = default;
+
  private:
   /** History of last seen K timestamps of this page. Least recent timestamp stored in front. */
   // Remove maybe_unused if you start using them. Feel free to change the member variables as you want.
 
-  //std::list<size_t> history_;
+  // std::list<size_t> history_;
   std::deque<size_t> history_;  // Use deque for efficient pop_front
   size_t k_;
   frame_id_t fid_;
