@@ -29,7 +29,7 @@ enum class AccessType { Unknown = 0, Lookup, Scan, Index };
 
 class LRUKNode {
  public:
-  LRUKNode(size_t k, frame_id_t fid) : k_(k), fid_(fid), is_evictable_(false) {}
+  LRUKNode(size_t k, frame_id_t fid) : k_(k), fid_(fid) {}
   LRUKNode() = default;
 
  private:
