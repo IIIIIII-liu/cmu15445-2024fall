@@ -80,10 +80,10 @@ class LRUKReplacer {
  private:
   // TODO(student): implement me! You can replace these member variables as you like.
   // Remove maybe_unused if you start using them.
-  std::unordered_map<frame_id_t, LRUKNode> node_store_;  //页表
-  size_t current_timestamp_{0};                          //当前的时间戳
-  size_t curr_size_{0};                                  //当前可淘汰页的个数
-  size_t replacer_size_;                                 //缓冲池帧的的总上限
+  std::unordered_map<frame_id_t, LRUKNode> node_store_;  // 页表
+  size_t current_timestamp_{0};                          // 当前的时间戳
+  size_t curr_size_{0};                                  // 当前可淘汰页的个数
+  size_t replacer_size_;                                 // 缓冲池帧的的总上限
   size_t k_;
   std::mutex latch_;
   auto CalculateBackwardKDistance(const LRUKNode &node) -> size_t;
