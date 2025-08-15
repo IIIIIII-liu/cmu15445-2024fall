@@ -77,7 +77,7 @@ auto LRUKReplacer::Evict() -> std::optional<frame_id_t> {
   size_t best_finite_oldest = std::numeric_limits<size_t>::max();
 
   for (auto &p : node_store_) {
-    frame_id_t fid = p.first;
+    frame_id_t fid = p.second.fid_;
     auto &node = p.second;
     if (!node.is_evictable_) {
       continue;
