@@ -41,34 +41,68 @@ LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_fra
  * @return the frame ID if a frame is successfully evicted, or `std::nullopt` if no frames can be evicted.
  */
 auto LRUKReplacer::Evict() -> std::optional<frame_id_t> {
-  // 使用优先队列来找到具有最大 backward k-distance 的帧
-  auto cmp = [this](frame_id_t a, frame_id_t b) {
-    const LRUKNode &node_a = node_store_[a];
-    const LRUKNode &node_b = node_store_[b];
-    size_t dist_a = CalculateBackwardKDistance(node_a);
-    size_t dist_b = CalculateBackwardKDistance(node_b);
-    if (dist_a != dist_b) {
-      return dist_a < dist_b;  // 最大 backward k-distance 优先
-    }
-    // 如果 backward k-distance 相同，使用 LRU 策略
-    return node_a.history_.front() > node_b.history_.front();  // 最旧的时间戳优先
-  };
-  // 使用锁来保护对 node_store_ 的访问
+  // std::lock_guard<std::mutex> lock(latch_);
+  // auto cmp = [this](frame_id_t a, frame_id_t b) {
+  //   LRUKNode &node_a = node_store_[a];
+  //   LRUKNode &node_b = node_store_[b];
+  //   if (CalculateBackwardKDistance(node_a) != CalculateBackwardKDistance(node_b)) {
+  //     return CalculateBackwardKDistance(node_a) < CalculateBackwardKDistance(node_b);
+  //   }
+  //   return node_a.history_.front() > node_b.history_.front();
+  // };
+  // std::priority_queue<frame_id_t, std::vector<frame_id_t>, decltype(cmp)> pq(cmp);
+  // for (const auto &[frame_id, node] : node_store_) {
+  //   if (node.is_evictable_) {
+  //     pq.push(frame_id);
+  //   }
+  // }
+  // if (!pq.empty()) {
+  //   frame_id_t victim_frame = pq.top();  // 队首元素是优先级最高的帧
+  //   node_store_.erase(victim_frame);
+  //   curr_size_--;
+  //   return victim_frame;
+  // }
+  // return std::nullopt;  // 如果没有可淘汰的帧，返回std::nullopt
   std::lock_guard<std::mutex> lk(latch_);
-  std::priority_queue<frame_id_t, std::vector<frame_id_t>, decltype(cmp)> pq(cmp);  // 创建使用cmp为比较函数的优先队列
-  for (const auto &pair : node_store_) {
-    const LRUKNode &node = pair.second;
-    if (node.is_evictable_) {
-      pq.push(pair.first);
+  if (curr_size_ == 0) return std::nullopt;
+
+  bool have_inf = false;
+  frame_id_t best_inf = -1;
+  size_t best_inf_oldest = std::numeric_limits<size_t>::max();
+  bool have_finite = false;
+  frame_id_t best_finite = -1;
+  size_t best_finite_dist = 0;
+  size_t best_finite_oldest = std::numeric_limits<size_t>::max();
+
+  for (auto &p : node_store_) {
+    frame_id_t fid = p.first;
+    auto &node = p.second;
+    if (!node.is_evictable_) continue;
+    if (node.history_.empty()) continue;  // skip or treat as fallback
+    if (node.history_.size() < k_) {
+      size_t oldest = node.history_.front();
+      if (!have_inf || oldest < best_inf_oldest) {
+        have_inf = true;
+        best_inf = fid;
+        best_inf_oldest = oldest;
+      }
+    } else {
+      size_t kth_time = node.history_.front();
+      size_t dist = (current_timestamp_ >= kth_time) ? (current_timestamp_ - kth_time) : 0;
+      if (!have_finite || dist > best_finite_dist || (dist == best_finite_dist && kth_time < best_finite_oldest)) {
+        have_finite = true;
+        best_finite = fid;
+        best_finite_dist = dist;
+        best_finite_oldest = kth_time;
+      }
     }
   }
-  if (!pq.empty()) {
-    frame_id_t victim_frame = pq.top();  // 队首元素是优先级最高的帧
-    node_store_.erase(victim_frame);
-    curr_size_--;
-    return victim_frame;
-  }
-  return std::nullopt;  // 如果没有可淘汰的帧，返回std::nullopt
+
+  frame_id_t victim = have_inf ? best_inf : (have_finite ? best_finite : -1);
+  if (victim == -1) return std::nullopt;
+  node_store_.erase(victim);
+  if (curr_size_ > 0) --curr_size_;
+  return victim;
 }
 
 /**
@@ -85,11 +119,11 @@ auto LRUKReplacer::Evict() -> std::optional<frame_id_t> {
  * leaderboard tests.
  */
 void LRUKReplacer::RecordAccess(frame_id_t frame_id, [[maybe_unused]] AccessType access_type) {
-  BUSTUB_ASSERT(frame_id >= 0 && frame_id < static_cast<frame_id_t>(replacer_size_), "frame_id is out of valid range.");
-
+  if (static_cast<size_t>(frame_id) >= replacer_size_) {
+    throw Exception("Invalid frame id");
+  }
   std::lock_guard<std::mutex> lk(latch_);
-  current_timestamp_++;
-
+  ++current_timestamp_;
   auto it = node_store_.find(frame_id);
   if (it == node_store_.end()) {
     // If the frame is not found, create a new LRUKNode
@@ -124,24 +158,19 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id, [[maybe_unused]] AccessType
  * @param set_evictable whether the given frame is evictable or not
  */
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
-  // 帧id有效性
-  BUSTUB_ASSERT(frame_id >= 0 && frame_id < static_cast<frame_id_t>(replacer_size_), "frame_id is out of valid range.");
-  {
-    std::lock_guard<std::mutex> lk(latch_);
-    // 检查帧是否存在
-    auto it = node_store_.find(frame_id);
-    if (it == node_store_.end()) {
-      return;
-    }
-
-    LRUKNode &node = it->second;
-    if (set_evictable && !node.is_evictable_) {
-      curr_size_++;
-    } else if (!set_evictable && node.is_evictable_) {
-      curr_size_--;
-    }
-
+  if (static_cast<size_t>(frame_id) >= replacer_size_) throw Exception("Invalid frame id");
+  std::lock_guard<std::mutex> lk(latch_);
+  auto it = node_store_.find(frame_id);
+  if (it == node_store_.end()) {
+    return;
+  }
+  LRUKNode &node = it->second;
+  if (node.is_evictable_ != set_evictable) {
     node.is_evictable_ = set_evictable;
+    if (set_evictable)
+      ++curr_size_;
+    else if (curr_size_ > 0)
+      --curr_size_;
   }
 }
 
@@ -163,17 +192,15 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
  * @param frame_id id of frame to be removed
  */
 void LRUKReplacer::Remove(frame_id_t frame_id) {
-  // 帧id有效性
-  BUSTUB_ASSERT(frame_id >= 0 && frame_id < static_cast<frame_id_t>(replacer_size_), "frame_id is out of valid range.");
+  if (static_cast<size_t>(frame_id) >= replacer_size_) throw Exception("Invalid frame id");
   std::lock_guard<std::mutex> lk(latch_);
   auto it = node_store_.find(frame_id);
   if (it == node_store_.end()) {
-    // Frame not found, do nothing
     return;
   }
   LRUKNode &node = it->second;
   if (!node.is_evictable_) {
-    throw std::runtime_error("Cannot remove a non-evictable frame");
+    throw Exception("Frame is not evictable");
   }
   node_store_.erase(it);
   curr_size_--;
@@ -189,12 +216,10 @@ void LRUKReplacer::Remove(frame_id_t frame_id) {
 auto LRUKReplacer::Size() -> size_t { return curr_size_; }
 
 auto LRUKReplacer::CalculateBackwardKDistance(const LRUKNode &node) -> size_t {
-  if (node.history_.size() < node.k_) {
-    return std::numeric_limits<size_t>::max();  // +inf for backward k-distance
+  if (node.history_.size() < k_) {
+    return std::numeric_limits<size_t>::max();  // +inf
   }
-  auto it = node.history_.begin();
-  std::advance(it, node.k_ - 1);    // Move to the k
-  return current_timestamp_ - *it;  // Calculate backward k-distance
+  return current_timestamp_ - node.history_[node.history_.size() - k_];
 }
 
 }  // namespace bustub
