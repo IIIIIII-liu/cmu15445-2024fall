@@ -17,11 +17,6 @@
 namespace bustub {
 
 DiskScheduler::DiskScheduler(DiskManager *disk_manager) : disk_manager_(disk_manager) {
-  // TODO(P1): remove this line after you have implemented the disk scheduler API
-  throw NotImplementedException(
-      "DiskScheduler is not implemented yet. If you have finished implementing the disk scheduler, please remove the "
-      "throw exception line in `disk_scheduler.cpp`.");
-
   // Spawn the background thread
   background_thread_.emplace([&] { StartWorkerThread(); });
 }
@@ -35,22 +30,51 @@ DiskScheduler::~DiskScheduler() {
 }
 
 /**
- * TODO(P1): Add implementation
- *
  * @brief Schedules a request for the DiskManager to execute.
- *
  * @param r The request to be scheduled.
  */
-void DiskScheduler::Schedule(DiskRequest r) {}
+void DiskScheduler::Schedule(DiskRequest r) {
+  // 检查传入的请求是否有效。如果无效，则通过 promise 异步地传递一个异常。
+  if (r.data_ == nullptr || r.page_id_ == INVALID_PAGE_ID) {
+    r.callback_.set_exception(std::make_exception_ptr(
+        Exception(ExceptionType::INVALID, "Invalid request: data is null or page_id is invalid.")));
+    return;  // 无效请求不入队，直接返回
+  }
+  // 将有效的请求移入队列。这里可以直接移动 r，Channel内部会负责包装成 optional。
+  request_queue_.Put(std::optional<DiskRequest>(std::move(r)));
+}
 
 /**
- * TODO(P1): Add implementation
- *
  * @brief Background worker thread function that processes scheduled requests.
- *
- * The background thread needs to process requests while the DiskScheduler exists, i.e., this function should not
- * return until ~DiskScheduler() is called. At that point you need to make sure that the function does return.
  */
-void DiskScheduler::StartWorkerThread() {}
+void DiskScheduler::StartWorkerThread() {
+  while (true) {
+    // 阻塞式地从队列中获取请求
+    auto request_opt = request_queue_.Get();
+
+    // 如果获取到的是 nullopt (哨兵信号)，则退出循环，线程结束
+    if (!request_opt.has_value()) {
+      break;
+    }
+
+    // 从 optional 中移出请求对象，提高效率
+    DiskRequest request = std::move(request_opt.value());
+
+    try {
+      // 根据请求类型执行读或写操作
+      if (request.is_write_) {
+        disk_manager_->WritePage(request.page_id_, request.data_);
+      } else {
+        disk_manager_->ReadPage(request.page_id_, request.data_);
+      }
+      // 操作成功，通过 promise 设置结果为 true
+      request.callback_.set_value(true);
+    } catch (...) {
+      // 如果磁盘操作过程中发生任何异常，则捕获它
+      //并通过 promise 将异常传递给调用者
+      request.callback_.set_exception(std::current_exception());
+    }
+  }
+}
 
 }  // namespace bustub
