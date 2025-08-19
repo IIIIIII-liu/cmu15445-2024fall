@@ -71,7 +71,7 @@ void DiskScheduler::StartWorkerThread() {
       request.callback_.set_value(true);
     } catch (...) {
       // 如果磁盘操作过程中发生任何异常，则捕获它
-      //并通过 promise 将异常传递给调用者
+      // 并通过 promise 将异常传递给调用者
       request.callback_.set_exception(std::current_exception());
     }
   }

@@ -12,9 +12,9 @@
 
 #pragma once  // 防止头文件被多次包含的预处理指令
 
-#include <future>    // 包含了 std::promise and std::future，用于处理异步操作的结果
+#include <future>    // NOLINT // 包含了 std::promise and std::future，用于处理异步操作的结果
 #include <optional>  // 包含了 std::optional，用于表示一个可能存在也可能不存在的值
-#include <thread>    // 包含了 std::thread，用于创建和管理线程
+#include <thread>    // NOLINT // 包含了 std::thread，用于创建和管理线程
 
 #include "common/channel.h"  // 引入自定义的线程安全通道（队列），用于在线程间传递数据
 #include "storage/disk/disk_manager.h"  // 引入磁盘管理器，实际执行磁盘读写操作
