@@ -542,7 +542,7 @@ void BufferPoolManager::FlushAllPagesUnsafe() {
  */
 void BufferPoolManager::FlushAllPages() {
   // LOG_DEBUG("刷新全部页");
-  //std::scoped_lock<std::mutex> lk(*bpm_latch_);
+  // std::scoped_lock<std::mutex> lk(*bpm_latch_);
 
   for (const auto &[page_id, frame_id] : page_table_) {
     FlushPage(page_id);
