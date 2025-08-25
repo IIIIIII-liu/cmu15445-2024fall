@@ -163,7 +163,7 @@ auto BufferPoolManager::NewPage() -> page_id_t {
   // 4. 绑定新页与帧，并设置帧元数据
   auto &new_frame = frames_[frame_id];
   std::lock_guard<std::shared_mutex> new_write_lk(new_frame->rwlatch_);
-  new_frame->pin_count_ = 0;  // 新页初始未被 pin
+  new_frame->pin_count_.store(0);  // 新页初始未被 pin
   new_frame->is_dirty_ = false;
   new_frame->page_id_ = new_page_id;
   page_table_[new_page_id] = frame_id;  // 更新页表映射
@@ -524,16 +524,30 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
  */
 void BufferPoolManager::FlushAllPagesUnsafe() {
   // LOG_DEBUG("不安全刷新全部页");
-  for (const auto &[page_id, frame_id] : page_table_) {
-    FlushPageUnsafe(page_id);
-    // auto &frame = frames_[frame_id];
+  // for (const auto &[page_id, frame_id] : page_table_) {
+  // FlushPageUnsafe(page_id);
+  //   // auto &frame = frames_[frame_id];
 
-    // if (frame->is_dirty_) {
-    //   frame->is_dirty_ = false;
+  //   // if (frame->is_dirty_) {
+  //   //   frame->is_dirty_ = false;
 
-    //   std::promise<bool> write_promise;
-    //   disk_scheduler_->Schedule({true, frame->GetDataMut(), page_id, std::move(write_promise)});
-    // }
+  //   //   std::promise<bool> write_promise;
+  //   //   disk_scheduler_->Schedule({true, frame->GetDataMut(), page_id, std::move(write_promise)});
+  //   // }
+  // }
+  // 先复制当前页 id 列表（短期全局锁，避免并发修改导致 UB）
+  std::vector<page_id_t> pages;
+  {
+    std::scoped_lock<std::mutex> glock(*bpm_latch_);
+    pages.reserve(page_table_.size());
+    for (const auto &kv : page_table_) {
+      pages.push_back(kv.first);
+    }
+  }
+
+  // 逐个发起不安全写回（不等待结果）
+  for (page_id_t pid : pages) {
+    FlushPageUnsafe(pid);
   }
 }
 
@@ -544,23 +558,37 @@ void BufferPoolManager::FlushAllPages() {
   // LOG_DEBUG("刷新全部页");
   // std::scoped_lock<std::mutex> lk(*bpm_latch_);
 
-  for (const auto &[page_id, frame_id] : page_table_) {
-    FlushPage(page_id);
-    // auto &frame = frames_[frame_id];
-    //  {
-    //    // 这里原本可以对 frame->rwlatch_ 加写锁以保证一致性
-    //    // std::unique_lock<std::shared_mutex> write_lock(frame->rwlatch_);
+  // for (const auto &[page_id, frame_id] : page_table_) {
+  //   FlushPage(page_id);
+  //   // auto &frame = frames_[frame_id];
+  //   //  {
+  //   //    // 这里原本可以对 frame->rwlatch_ 加写锁以保证一致性
+  //   //    // std::unique_lock<std::shared_mutex> write_lock(frame->rwlatch_);
 
-    //   std::promise<bool> write_promise;
-    //   auto write_future = write_promise.get_future();
-    //   disk_scheduler_->Schedule({true, frame->GetDataMut(), page_id, std::move(write_promise)});
+  //   //   std::promise<bool> write_promise;
+  //   //   auto write_future = write_promise.get_future();
+  //   //   disk_scheduler_->Schedule({true, frame->GetDataMut(), page_id, std::move(write_promise)});
 
-    //   if (write_future.get()) {
-    //     frame->is_dirty_ = false;
-    //   } else {
-    //     LOG_ERROR("Failed to flush page %d to disk", page_id);
-    //   }
-    // }
+  //   //   if (write_future.get()) {
+  //   //     frame->is_dirty_ = false;
+  //   //   } else {
+  //   //     LOG_ERROR("Failed to flush page %d to disk", page_id);
+  //   //   }
+  //   // }
+  // }
+  // 先复制 page_table 的 snapshot，短期持全局锁
+  std::vector<page_id_t> pages;
+  {
+    std::scoped_lock<std::mutex> glock(*bpm_latch_);
+    pages.reserve(page_table_.size());
+    for (const auto &kv : page_table_) {
+      pages.push_back(kv.first);
+    }
+  }
+
+  // 逐个安全刷盘（每次 FlushPage 会做 snapshot 并等待写完成）
+  for (page_id_t pid : pages) {
+    FlushPage(pid);
   }
 }
 
