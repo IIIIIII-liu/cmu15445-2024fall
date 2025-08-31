@@ -170,13 +170,13 @@ class BPlusTree {
   void MergeWithRight(BPlusTreePage *page, BPlusTreePage *right_page, BPlusTreePage *parent_page, int index);
 
   // 成员变量
-  std::string index_name_;       // 索引名
-  BufferPoolManager *bpm_;       // BufferPool 管理器（非拥有）
-  KeyComparator comparator_;     // 键比较器
+  std::string index_name_;        // 索引名
+  BufferPoolManager *bpm_;        // BufferPool 管理器（非拥有）
+  KeyComparator comparator_;      // 键比较器
   std::vector<std::string> log_;  // 调试日志（可选）
-  int leaf_max_size_;            // 叶页最大容量
-  int internal_max_size_;        // 内部页最大容量
-  page_id_t header_page_id_;     // header 页的 id（存 root 信息）
+  int leaf_max_size_;             // 叶页最大容量
+  int internal_max_size_;         // 内部页最大容量
+  page_id_t header_page_id_;      // header 页的 id（存 root 信息）
 };
 
 /**
