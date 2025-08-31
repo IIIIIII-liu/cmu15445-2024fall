@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "buffer/buffer_pool_manager.h"
+// NOLINTNEXTLINE(build/c++11)
 #include <future>
+// NOLINTNEXTLINE(build/c++11)
 #include <mutex>
 #include <optional>
 #include <shared_mutex>

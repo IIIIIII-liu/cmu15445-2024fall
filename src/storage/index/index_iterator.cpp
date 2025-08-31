@@ -54,10 +54,8 @@ auto INDEXITERATOR_TYPE::operator++() -> INDEXITERATOR_TYPE & {
   ReadPageGuard page_guard = bpm_->ReadPage(page_id_);
   auto leaf_page = page_guard.template As<B_PLUS_TREE_LEAF_PAGE_TYPE>();
 
-  // ��index�����󣬳����˵�ǰҳ���size��С����ͨ��next_page_id��������Ϣ
   if (index_ >= leaf_page->GetSize()) {
     page_id_t next_page_id = leaf_page->GetNextPageId();
-    // ����Ѿ��������һ���������һ����ֵ�ԣ��򽫵���������ΪEnd()
     if (next_page_id == INVALID_PAGE_ID) {
       index_ = -1;
       page_id_ = next_page_id;

@@ -11,8 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "storage/page/page_guard.h"
+// NOLINTNEXTLINE(build/c++11)
 #include <future>
 #include <memory>
+// NOLINTNEXTLINE(build/c++11)
 #include <mutex>
 #include <shared_mutex>
 #include "buffer/buffer_pool_manager.h"
