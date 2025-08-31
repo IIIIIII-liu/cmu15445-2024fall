@@ -27,6 +27,7 @@ class IndexIterator {
  public:
   // you may define your own constructor based on your member variables
   IndexIterator();
+  IndexIterator(BufferPoolManager *bpm, page_id_t page_id, int index);
   ~IndexIterator();  // NOLINT
 
   auto IsEnd() -> bool;
@@ -35,12 +36,17 @@ class IndexIterator {
 
   auto operator++() -> IndexIterator &;
 
-  auto operator==(const IndexIterator &itr) const -> bool { UNIMPLEMENTED("TODO(P2): Add implementation."); }
+  auto operator==(const IndexIterator &itr) const -> bool { return page_id_ == itr.page_id_ && index_ == itr.index_; }
 
-  auto operator!=(const IndexIterator &itr) const -> bool { UNIMPLEMENTED("TODO(P2): Add implementation."); }
+  auto operator!=(const IndexIterator &itr) const -> bool { return !(*this == itr); }
 
  private:
   // add your own private member variables here
+  BufferPoolManager *bpm_;
+  // ReadPageGuard page_guard_;
+  page_id_t page_id_;
+  int index_;
+  std::pair<KeyType, ValueType> result_;
 };
 
 }  // namespace bustub

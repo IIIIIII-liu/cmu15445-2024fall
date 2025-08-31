@@ -81,17 +81,17 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <new>
 #include <sstream>
 #include <streambuf>
 #include <string>
 #include <vector>
-#include <exception>
-#include <iterator>
 
 #if defined(BACKWARD_SYSTEM_LINUX)
 
@@ -1124,7 +1124,7 @@ public:
   NOINLINE
   size_t load_here(size_t depth = 32, void *context = nullptr,
                    void *error_addr = nullptr) {
-    set_context(static_cast<CONTEXT*>(context));
+    set_context(static_cast<CONTEXT *>(context));
     set_error_addr(error_addr);
     CONTEXT localCtx; // used when no context is provided
 
@@ -1218,7 +1218,7 @@ class TraceResolverImplBase {
 public:
   virtual ~TraceResolverImplBase() {}
 
-  virtual void load_addresses(void *const*addresses, int address_count) {
+  virtual void load_addresses(void *const *addresses, int address_count) {
     (void)addresses;
     (void)address_count;
   }
@@ -1242,7 +1242,8 @@ template <typename TAG> class TraceResolverImpl;
 
 #ifdef BACKWARD_SYSTEM_UNKNOWN
 
-template <> class TraceResolverImpl<system_tag::unknown_tag>
+template <>
+class TraceResolverImpl<system_tag::unknown_tag>
     : public TraceResolverImplBase {};
 
 #endif
@@ -1317,7 +1318,7 @@ template <>
 class TraceResolverLinuxImpl<trace_resolver_tag::backtrace_symbol>
     : public TraceResolverLinuxBase {
 public:
-  void load_addresses(void *const*addresses, int address_count) override {
+  void load_addresses(void *const *addresses, int address_count) override {
     if (address_count == 0) {
       return;
     }
@@ -1418,7 +1419,7 @@ public:
       // this is preferable. Libbfd will search for stripped debug
       // symbols in the same directory.
       fobj = load_object_with_bfd(trace.object_filename);
-    } else{
+    } else {
       // The original object file was *deleted*! The only hope is
       // that the debug symbols are either inside the shared
       // object file, or are in the same directory, and this is
@@ -2443,8 +2444,8 @@ private:
         // If we have a valid elf handle, return the new elf handle
         // and file handle and discard the original ones
         if (debuglink_elf) {
-          elf_handle = move(debuglink_elf);
-          file_handle = move(debuglink_file);
+          elf_handle = std::move(debuglink_elf);
+          file_handle = std::move(debuglink_file);
         }
       }
     }
@@ -2466,10 +2467,9 @@ private:
 
     dwarf_handle.reset(dwarf_debug);
 
-    r.file_handle = move(file_handle);
-    r.elf_handle = move(elf_handle);
-    r.dwarf_handle = move(dwarf_handle);
-
+    r.file_handle = std::move(file_handle);
+    r.elf_handle = std::move(elf_handle);
+    r.dwarf_handle = std::move(dwarf_handle);
     return r;
   }
 
@@ -3339,9 +3339,10 @@ private:
       char **srcfiles = 0;
       Dwarf_Signed file_count = 0;
       if (dwarf_srcfiles(cu_die, &srcfiles, &file_count, &error) == DW_DLV_OK) {
-        if (file_count > 0 && file_index <= static_cast<Dwarf_Unsigned>(file_count)) {
+        if (file_count > 0 &&
+            file_index <= static_cast<Dwarf_Unsigned>(file_count)) {
           file = std::string(srcfiles[file_index - 1]);
-	}
+        }
 
         // Deallocate all strings!
         for (int i = 0; i < file_count; ++i) {
@@ -3478,7 +3479,7 @@ template <>
 class TraceResolverDarwinImpl<trace_resolver_tag::backtrace_symbol>
     : public TraceResolverImplBase {
 public:
-  void load_addresses(void *const*addresses, int address_count) override {
+  void load_addresses(void *const *addresses, int address_count) override {
     if (address_count == 0) {
       return;
     }
@@ -3595,7 +3596,8 @@ public:
   }
 };
 
-template <> class TraceResolverImpl<system_tag::windows_tag>
+template <>
+class TraceResolverImpl<system_tag::windows_tag>
     : public TraceResolverImplBase {
 public:
   TraceResolverImpl() {
@@ -3640,14 +3642,14 @@ public:
 
     if (!SymFromAddr(process, (ULONG64)t.addr, &displacement, &sym.sym)) {
       // TODO:  error handling everywhere
-      char* lpMsgBuf;
+      char *lpMsgBuf;
       DWORD dw = GetLastError();
 
       if (FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER |
                              FORMAT_MESSAGE_FROM_SYSTEM |
                              FORMAT_MESSAGE_IGNORE_INSERTS,
                          NULL, dw, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                         (char*)&lpMsgBuf, 0, NULL)) {
+                         (char *)&lpMsgBuf, 0, NULL)) {
         std::fprintf(stderr, "%s\n", lpMsgBuf);
         LocalFree(lpMsgBuf);
       }
@@ -4212,11 +4214,11 @@ public:
 #elif defined(__arm__)
     error_addr = reinterpret_cast<void *>(uctx->uc_mcontext.arm_pc);
 #elif defined(__aarch64__)
-    #if defined(__APPLE__)
-      error_addr = reinterpret_cast<void *>(uctx->uc_mcontext->__ss.__pc);
-    #else
-      error_addr = reinterpret_cast<void *>(uctx->uc_mcontext.pc);
-    #endif
+#if defined(__APPLE__)
+    error_addr = reinterpret_cast<void *>(uctx->uc_mcontext->__ss.__pc);
+#else
+    error_addr = reinterpret_cast<void *>(uctx->uc_mcontext.pc);
+#endif
 #elif defined(__mips__)
     error_addr = reinterpret_cast<void *>(
         reinterpret_cast<struct sigcontext *>(&uctx->uc_mcontext)->sc_pc);

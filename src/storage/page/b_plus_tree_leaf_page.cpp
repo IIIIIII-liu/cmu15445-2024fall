@@ -32,25 +32,56 @@ namespace bustub {
  * @param max_size Max size of the leaf node
  */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(int max_size) { UNIMPLEMENTED("TODO(P2): Add implementation."); }
+void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(int max_size) {
+  SetPageType(IndexPageType::LEAF_PAGE);
+  SetSize(0);
+  SetMaxSize(max_size);
+  next_page_id_ = INVALID_PAGE_ID;
+}
 
 /**
  * Helper methods to set/get next page id
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::GetNextPageId() const -> page_id_t { UNIMPLEMENTED("TODO(P2): Add implementation."); }
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::GetNextPageId() const -> page_id_t { return next_page_id_; }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) {
-  UNIMPLEMENTED("TODO(P2): Add implementation.");
-}
+void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) { next_page_id_ = next_page_id; }
 
 /*
  * Helper method to find and return the key associated with input "index" (a.k.a
  * array offset)
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const -> KeyType { UNIMPLEMENTED("TODO(P2): Add implementation."); }
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const -> KeyType {
+  // if (index < 0 || index >= GetSize()) {
+  //   throw Exception(ExceptionType::OUT_OF_RANGE, "Index out of range in BPlusTreeLeafPage::KeyAt");
+  // }
+  return key_array_[index];
+}
+INDEX_TEMPLATE_ARGUMENTS
+void BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>::SetKeyAt(int index, const KeyType &key) {
+  // if (index < 0 || index >= GetMaxSize()) {
+  //   throw std::out_of_range("Index out of range in BPlusTreeLeafPage::SetKeyAt");
+  // }
+  key_array_[index] = key;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::ValueAt(int index) const -> ValueType {
+  // if (index < 0 || index >= GetSize()) {
+  //   throw Exception(ExceptionType::OUT_OF_RANGE, "Index out of range in BPlusTreeLeafPage::ValueAt");
+  // }
+  return rid_array_[index];
+}
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_LEAF_PAGE_TYPE::SetValueAt(int index, const ValueType &value) {
+  // int siz_ = GetSize();
+  // if (index < 0 || index >= siz_) {
+  //   throw Exception(ExceptionType::OUT_OF_RANGE, "Index out of range in BPlusTreeLeafPage::SetValueAt");
+  // }
+  rid_array_[index] = value;
+}
 
 template class BPlusTreeLeafPage<GenericKey<4>, RID, GenericComparator<4>>;
 template class BPlusTreeLeafPage<GenericKey<8>, RID, GenericComparator<8>>;
