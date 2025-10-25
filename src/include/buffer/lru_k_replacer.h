@@ -39,7 +39,7 @@ class LRUKNode {
   // std::list<size_t> history_;
   std::deque<size_t> history_;  // Use deque for efficient pop_front
   size_t k_;
-  frame_id_t fid_;
+  [[maybe_unused]] frame_id_t fid_;
   bool is_evictable_{false};
   friend class LRUKReplacer;
 };

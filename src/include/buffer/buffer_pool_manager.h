@@ -42,7 +42,7 @@ class FrameHeader {
   friend class BufferPoolManager;
   friend class ReadPageGuard;
   friend class WritePageGuard;
-
+  friend class PageGuard;
  public:
   explicit FrameHeader(frame_id_t frame_id);
 

@@ -41,88 +41,88 @@ LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_fra
  * @return the frame ID if a frame is successfully evicted, or `std::nullopt` if no frames can be evicted.
  */
 auto LRUKReplacer::Evict() -> std::optional<frame_id_t> {
-  // std::lock_guard<std::mutex> lock(latch_);
-  // auto cmp = [this](frame_id_t a, frame_id_t b) {
-  //   LRUKNode &node_a = node_store_[a];
-  //   LRUKNode &node_b = node_store_[b];
-  //   if (CalculateBackwardKDistance(node_a) != CalculateBackwardKDistance(node_b)) {
-  //     return CalculateBackwardKDistance(node_a) < CalculateBackwardKDistance(node_b);
+  std::lock_guard<std::mutex> lock(latch_);
+  auto cmp = [this](frame_id_t a, frame_id_t b) {
+    LRUKNode &node_a = node_store_[a];
+    LRUKNode &node_b = node_store_[b];
+    if (CalculateBackwardKDistance(node_a) != CalculateBackwardKDistance(node_b)) {
+      return CalculateBackwardKDistance(node_a) < CalculateBackwardKDistance(node_b);
+    }
+    return node_a.history_.front() > node_b.history_.front();
+  };
+  std::priority_queue<frame_id_t, std::vector<frame_id_t>, decltype(cmp)> pq(cmp);
+  for (const auto &[frame_id, node] : node_store_) {
+    if (node.is_evictable_) {
+      pq.push(frame_id);
+    }
+  }
+  if (!pq.empty()) {
+    frame_id_t victim_frame = pq.top();  // 队首元素是优先级最高的帧
+    node_store_.erase(victim_frame);
+    curr_size_--;
+    return victim_frame;
+  }
+  return std::nullopt;  // 如果没有可淘汰的帧，返回std::nullopt
+  // std::lock_guard<std::mutex> lk(latch_);
+  // if (curr_size_ == 0) {
+  //   return std::nullopt;
+  // }
+
+  // bool have_inf = false;
+  // frame_id_t best_inf = -1;
+  // size_t best_inf_oldest = std::numeric_limits<size_t>::max();
+  // bool have_finite = false;
+  // frame_id_t best_finite = -1;
+  // size_t best_finite_dist = 0;
+  // size_t best_finite_oldest = std::numeric_limits<size_t>::max();
+
+  // for (auto &p : node_store_) {
+  //   frame_id_t fid = p.second.fid_;
+  //   auto &node = p.second;
+  //   if (!node.is_evictable_) {
+  //     continue;
   //   }
-  //   return node_a.history_.front() > node_b.history_.front();
-  // };
-  // std::priority_queue<frame_id_t, std::vector<frame_id_t>, decltype(cmp)> pq(cmp);
-  // for (const auto &[frame_id, node] : node_store_) {
-  //   if (node.is_evictable_) {
-  //     pq.push(frame_id);
+  //   if (node.history_.empty()) {
+  //     continue;  // skip or treat as fallback
+  //   }
+  //   if (node.history_.size() < k_) {
+  //     size_t oldest = node.history_.front();
+  //     if (!have_inf || oldest < best_inf_oldest) {
+  //       have_inf = true;
+  //       best_inf = fid;
+  //       best_inf_oldest = oldest;
+  //     }
+  //   } else {
+  //     size_t kth_time = node.history_.front();
+  //     size_t dist = 0;
+  //     if (current_timestamp_ >= kth_time) {
+  //       dist = current_timestamp_ - kth_time;
+  //     } else {
+  //       dist = 0;
+  //     }
+  //     if (!have_finite || dist > best_finite_dist || (dist == best_finite_dist && kth_time < best_finite_oldest)) {
+  //       have_finite = true;
+  //       best_finite = fid;
+  //       best_finite_dist = dist;
+  //       best_finite_oldest = kth_time;
+  //     }
   //   }
   // }
-  // if (!pq.empty()) {
-  //   frame_id_t victim_frame = pq.top();  // 队首元素是优先级最高的帧
-  //   node_store_.erase(victim_frame);
-  //   curr_size_--;
-  //   return victim_frame;
+
+  // frame_id_t victim = -1;
+  // if (have_inf) {
+  //   victim = best_inf;
+  // } else if (have_finite) {
+  //   victim = best_finite;
+  // } else {
+  //   return std::nullopt;
   // }
-  // return std::nullopt;  // 如果没有可淘汰的帧，返回std::nullopt
-  std::lock_guard<std::mutex> lk(latch_);
-  if (curr_size_ == 0) {
-    return std::nullopt;
-  }
 
-  bool have_inf = false;
-  frame_id_t best_inf = -1;
-  size_t best_inf_oldest = std::numeric_limits<size_t>::max();
-  bool have_finite = false;
-  frame_id_t best_finite = -1;
-  size_t best_finite_dist = 0;
-  size_t best_finite_oldest = std::numeric_limits<size_t>::max();
-
-  for (auto &p : node_store_) {
-    frame_id_t fid = p.second.fid_;
-    auto &node = p.second;
-    if (!node.is_evictable_) {
-      continue;
-    }
-    if (node.history_.empty()) {
-      continue;  // skip or treat as fallback
-    }
-    if (node.history_.size() < k_) {
-      size_t oldest = node.history_.front();
-      if (!have_inf || oldest < best_inf_oldest) {
-        have_inf = true;
-        best_inf = fid;
-        best_inf_oldest = oldest;
-      }
-    } else {
-      size_t kth_time = node.history_.front();
-      size_t dist = 0;
-      if (current_timestamp_ >= kth_time) {
-        dist = current_timestamp_ - kth_time;
-      } else {
-        dist = 0;
-      }
-      if (!have_finite || dist > best_finite_dist || (dist == best_finite_dist && kth_time < best_finite_oldest)) {
-        have_finite = true;
-        best_finite = fid;
-        best_finite_dist = dist;
-        best_finite_oldest = kth_time;
-      }
-    }
-  }
-
-  frame_id_t victim = -1;
-  if (have_inf) {
-    victim = best_inf;
-  } else if (have_finite) {
-    victim = best_finite;
-  } else {
-    return std::nullopt;
-  }
-
-  node_store_.erase(victim);
-  if (curr_size_ > 0) {
-    --curr_size_;
-  }
-  return victim;
+  // node_store_.erase(victim);
+  // if (curr_size_ > 0) {
+  //   --curr_size_;
+  // }
+  // return victim;
 }
 
 /**
